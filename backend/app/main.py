@@ -10,6 +10,8 @@ from typing import Dict, List, Any
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import orjson  # Faster than built-in json
 
+from .geometry import get_feature_area  # Import our geometry module
+
 # Create FastAPI application instance
 app = FastAPI(
     title="Loam Paddock Analyser",
@@ -70,7 +72,7 @@ async def upload(file: UploadFile = File(...)):
         file: Uploaded GeoJSON file
 
     Returns:
-        Grouped paddocks by project with counts
+        Grouped paddocks by project with area calculations
     """
     # Check file extension
     if not file.filename.lower().endswith((".geojson", ".json")):
@@ -106,21 +108,47 @@ async def upload(file: UploadFile = File(...)):
     # Get features
     features = data.get("features", [])
     
-    # Group by project
-    # Using defaultdict to automatically initialize counters
+    # Group by project with area calculations
     projects = defaultdict(lambda: {
         "paddock_count": 0,
+        "valid_paddocks": 0,
+        "invalid_paddocks": 0,
+        "area_m2": 0.0,
         "paddock_names": []
     })
+    
+    total_invalid = 0
     
     for feature in features:
         project_name = extract_project_name(feature)
         projects[project_name]["paddock_count"] += 1
         
-        # Also collect paddock names for debugging
+        # Get paddock name for debugging
         props = feature.get("properties", {})
         paddock_name = props.get("name", "Unnamed")
-        projects[project_name]["paddock_names"].append(paddock_name)
+        
+        # Calculate area
+        area_info = get_feature_area(feature)
+        
+        if area_info:
+            # Valid geometry
+            projects[project_name]["valid_paddocks"] += 1
+            projects[project_name]["area_m2"] += area_info["area_m2"]
+            projects[project_name]["paddock_names"].append({
+                "name": paddock_name,
+                "area_ha": round(area_info["area_ha"], 2),
+                "area_ac": round(area_info["area_ac"], 2),
+            })
+        else:
+            # Invalid geometry
+            projects[project_name]["invalid_paddocks"] += 1
+            projects[project_name]["paddock_names"].append({
+                "name": paddock_name,
+                "area_ha": None,
+                "area_ac": None,
+                "note": "Invalid geometry"
+            })
+            total_invalid += 1
     
     # Convert to list of project summaries
     project_list = []
@@ -128,7 +156,12 @@ async def upload(file: UploadFile = File(...)):
         project_list.append({
             "project_name": name,
             "paddock_count": data["paddock_count"],
-            "paddock_names": data["paddock_names"]
+            "valid_paddocks": data["valid_paddocks"],
+            "invalid_paddocks": data["invalid_paddocks"],
+            "area_m2": round(data["area_m2"], 2),
+            "area_ha": round(data["area_m2"] / 10_000, 2),
+            "area_ac": round(data["area_m2"] * 0.000247105, 2),
+            "paddocks": data["paddock_names"]
         })
     
     # Sort by project name
@@ -138,7 +171,7 @@ async def upload(file: UploadFile = File(...)):
         "summary": {
             "total_projects": len(project_list),
             "total_paddocks": len(features),
+            "invalid_paddocks": total_invalid,
         },
         "projects": project_list,
-        "message": "Paddocks grouped by project (area calculations not yet implemented)"
     }

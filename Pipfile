@@ -8,6 +8,8 @@ fastapi = "*"
 uvicorn = {extras = ["standard"], version = "*"}
 python-multipart = "*"
 orjson = "*"
+shapely = "*"
+pyproj = "*"
 
 [dev-packages]
 pytest = "*"
