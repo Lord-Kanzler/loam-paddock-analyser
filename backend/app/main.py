@@ -6,11 +6,12 @@ A simple FastAPI application for processing GeoJSON paddock data.
 
 import json
 from collections import defaultdict
-from typing import Dict, List, Any
+from typing import Dict, Any
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import orjson  # Faster than built-in json
 
-from .geometry import get_feature_area  # Import our geometry module
+from .geometry import get_feature_area, create_normalized_feature
+from .models import UploadResponse, ProjectSummary, UploadSummary, PaddockDetail
 
 # Create FastAPI application instance
 app = FastAPI(
@@ -63,7 +64,7 @@ def extract_project_name(feature: Dict[str, Any]) -> str:
     return str(project).strip()
 
 
-@app.post("/api/upload")
+@app.post("/api/upload", response_model=UploadResponse)
 async def upload(file: UploadFile = File(...)):
     """
     Upload a GeoJSON file for processing.
@@ -72,7 +73,7 @@ async def upload(file: UploadFile = File(...)):
         file: Uploaded GeoJSON file
 
     Returns:
-        Grouped paddocks by project with area calculations
+        Grouped paddocks by project with area calculations and normalized GeoJSON
     """
     # Check file extension
     if not file.filename.lower().endswith((".geojson", ".json")):
@@ -114,64 +115,85 @@ async def upload(file: UploadFile = File(...)):
         "valid_paddocks": 0,
         "invalid_paddocks": 0,
         "area_m2": 0.0,
-        "paddock_names": []
+        "paddocks": []
     })
     
     total_invalid = 0
+    normalized_features = []
     
     for feature in features:
         project_name = extract_project_name(feature)
         projects[project_name]["paddock_count"] += 1
         
-        # Get paddock name for debugging
+        # Get paddock name
         props = feature.get("properties", {})
         paddock_name = props.get("name", "Unnamed")
         
         # Calculate area
         area_info = get_feature_area(feature)
         
+        # Create normalized feature (with computed areas if valid)
+        normalized_feature = create_normalized_feature(feature, area_info)
+        normalized_features.append(normalized_feature)
+        
         if area_info:
             # Valid geometry
             projects[project_name]["valid_paddocks"] += 1
             projects[project_name]["area_m2"] += area_info["area_m2"]
-            projects[project_name]["paddock_names"].append({
-                "name": paddock_name,
-                "area_ha": round(area_info["area_ha"], 2),
-                "area_ac": round(area_info["area_ac"], 2),
-            })
+            
+            # Create PaddockDetail object
+            paddock = PaddockDetail(
+                name=paddock_name,
+                area_ha=round(area_info["area_ha"], 2),
+                area_ac=round(area_info["area_ac"], 2),
+            )
+            projects[project_name]["paddocks"].append(paddock)
         else:
             # Invalid geometry
             projects[project_name]["invalid_paddocks"] += 1
-            projects[project_name]["paddock_names"].append({
-                "name": paddock_name,
-                "area_ha": None,
-                "area_ac": None,
-                "note": "Invalid geometry"
-            })
+            
+            # Create PaddockDetail with error note
+            error_msg = normalized_feature["properties"].get("error", "Invalid geometry")
+            paddock = PaddockDetail(
+                name=paddock_name,
+                area_ha=None,
+                area_ac=None,
+                note=error_msg
+            )
+            projects[project_name]["paddocks"].append(paddock)
             total_invalid += 1
     
-    # Convert to list of project summaries
+    # Convert to list of ProjectSummary objects
     project_list = []
     for name, data in projects.items():
-        project_list.append({
-            "project_name": name,
-            "paddock_count": data["paddock_count"],
-            "valid_paddocks": data["valid_paddocks"],
-            "invalid_paddocks": data["invalid_paddocks"],
-            "area_m2": round(data["area_m2"], 2),
-            "area_ha": round(data["area_m2"] / 10_000, 2),
-            "area_ac": round(data["area_m2"] * 0.000247105, 2),
-            "paddocks": data["paddock_names"]
-        })
+        project_summary = ProjectSummary(
+            project_name=name,
+            paddock_count=data["paddock_count"],
+            valid_paddocks=data["valid_paddocks"],
+            invalid_paddocks=data["invalid_paddocks"],
+            area_m2=round(data["area_m2"], 2),
+            area_ha=round(data["area_m2"] / 10_000, 2),
+            area_ac=round(data["area_m2"] * 0.000247105, 2),
+            paddocks=data["paddocks"]
+        )
+        project_list.append(project_summary)
     
     # Sort by project name
-    project_list.sort(key=lambda p: p["project_name"])
+    project_list.sort(key=lambda p: p.project_name)
 
-    return {
-        "summary": {
-            "total_projects": len(project_list),
-            "total_paddocks": len(features),
-            "invalid_paddocks": total_invalid,
-        },
-        "projects": project_list,
+    # Create normalized GeoJSON FeatureCollection
+    normalized_geojson = {
+        "type": "FeatureCollection",
+        "features": normalized_features
     }
+
+    # Create response using Pydantic models
+    return UploadResponse(
+        summary=UploadSummary(
+            total_projects=len(project_list),
+            total_paddocks=len(features),
+            invalid_paddocks=total_invalid,
+        ),
+        projects=project_list,
+        normalized_geojson=normalized_geojson,
+    )
