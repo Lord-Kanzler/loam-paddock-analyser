@@ -5,6 +5,8 @@ A simple FastAPI application for processing GeoJSON paddock data.
 """
 
 import json
+from collections import defaultdict
+from typing import Dict, List, Any
 from fastapi import FastAPI, UploadFile, File, HTTPException
 import orjson  # Faster than built-in json
 
@@ -28,6 +30,37 @@ def health():
     return {"status": "ok"}
 
 
+def extract_project_name(feature: Dict[str, Any]) -> str:
+    """
+    Extract project name from a GeoJSON feature's properties.
+    
+    Looks for these fields in order:
+    1. Project__Name (from sample data)
+    2. project_name
+    3. project
+    
+    Args:
+        feature: GeoJSON Feature dict
+        
+    Returns:
+        Project name, or "Unknown" if not found or null
+    """
+    props = feature.get("properties") or {}
+    
+    # Try different possible field names
+    project = (
+        props.get("Project__Name") or 
+        props.get("project_name") or 
+        props.get("project")
+    )
+    
+    # Return "Unknown" if null or empty string
+    if not project:
+        return "Unknown"
+    
+    return str(project).strip()
+
+
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
     """
@@ -37,7 +70,7 @@ async def upload(file: UploadFile = File(...)):
         file: Uploaded GeoJSON file
 
     Returns:
-        Basic analysis of the GeoJSON structure
+        Grouped paddocks by project with counts
     """
     # Check file extension
     if not file.filename.lower().endswith((".geojson", ".json")):
@@ -70,13 +103,42 @@ async def upload(file: UploadFile = File(...)):
             detail="Expected a GeoJSON FeatureCollection",
         )
 
-    # Get basic info
+    # Get features
     features = data.get("features", [])
+    
+    # Group by project
+    # Using defaultdict to automatically initialize counters
+    projects = defaultdict(lambda: {
+        "paddock_count": 0,
+        "paddock_names": []
+    })
+    
+    for feature in features:
+        project_name = extract_project_name(feature)
+        projects[project_name]["paddock_count"] += 1
+        
+        # Also collect paddock names for debugging
+        props = feature.get("properties", {})
+        paddock_name = props.get("name", "Unnamed")
+        projects[project_name]["paddock_names"].append(paddock_name)
+    
+    # Convert to list of project summaries
+    project_list = []
+    for name, data in projects.items():
+        project_list.append({
+            "project_name": name,
+            "paddock_count": data["paddock_count"],
+            "paddock_names": data["paddock_names"]
+        })
+    
+    # Sort by project name
+    project_list.sort(key=lambda p: p["project_name"])
 
     return {
-        "filename": file.filename,
-        "type": data.get("type"),
-        "feature_count": len(features),
-        "crs": data.get("crs", "Not specified"),
-        "message": "GeoJSON parsed successfully (detailed processing not yet implemented)",
+        "summary": {
+            "total_projects": len(project_list),
+            "total_paddocks": len(features),
+        },
+        "projects": project_list,
+        "message": "Paddocks grouped by project (area calculations not yet implemented)"
     }
