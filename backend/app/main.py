@@ -4,7 +4,9 @@ Loam Paddock Analyser API
 A simple FastAPI application for processing GeoJSON paddock data.
 """
 
+import json
 from fastapi import FastAPI, UploadFile, File, HTTPException
+import orjson  # Faster than built-in json
 
 # Create FastAPI application instance
 app = FastAPI(
@@ -35,7 +37,7 @@ async def upload(file: UploadFile = File(...)):
         file: Uploaded GeoJSON file
 
     Returns:
-        Basic file information (for now)
+        Basic analysis of the GeoJSON structure
     """
     # Check file extension
     if not file.filename.lower().endswith((".geojson", ".json")):
@@ -45,11 +47,36 @@ async def upload(file: UploadFile = File(...)):
         )
 
     # Read file content
-    content = await file.read()
+    raw_bytes = await file.read()
 
-    # Return basic info
+    # Parse JSON
+    try:
+        # Try fast orjson first
+        data = orjson.loads(raw_bytes)
+    except Exception:
+        # Fall back to standard json library
+        try:
+            data = json.loads(raw_bytes)
+        except Exception as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid JSON: {str(e)}",
+            )
+
+    # Validate it's a FeatureCollection
+    if data.get("type") != "FeatureCollection":
+        raise HTTPException(
+            status_code=400,
+            detail="Expected a GeoJSON FeatureCollection",
+        )
+
+    # Get basic info
+    features = data.get("features", [])
+
     return {
         "filename": file.filename,
-        "size_bytes": len(content),
-        "message": "File received successfully (processing not yet implemented)",
+        "type": data.get("type"),
+        "feature_count": len(features),
+        "crs": data.get("crs", "Not specified"),
+        "message": "GeoJSON parsed successfully (detailed processing not yet implemented)",
     }
