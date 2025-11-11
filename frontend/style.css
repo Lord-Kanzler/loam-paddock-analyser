@@ -1,0 +1,555 @@
+/**
+ * Paddock Analyser Stylesheet
+ * 
+ * Design Principles:
+ * - High contrast for readability (WCAG AA compliant)
+ * - Clean, professional aesthetic for agricultural data
+ * - Responsive grid layout for desktop and tablet
+ * - Consistent spacing using CSS custom properties
+ */
+
+/* === CSS Custom Properties === */
+:root {
+    /* Color Palette */
+    --color-primary: #27ae60;
+    --color-primary-dark: #229954;
+    --color-secondary: #3498db;
+    --color-accent: #e67e22;
+    
+    --color-text-primary: #2c3e50;
+    --color-text-secondary: #7f8c8d;
+    --color-text-muted: #95a5a6;
+    
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f5f7fa;
+    --color-bg-hover: #ecf0f1;
+    --color-bg-active: #d5d8dc;
+    
+    --color-border: #bdc3c7;
+    --color-border-light: #ecf0f1;
+    
+    --color-success: #27ae60;
+    --color-warning: #f39c12;
+    --color-error: #e74c3c;
+    --color-error-bg: #ffe6e6;
+    
+    /* Spacing Scale */
+    --spacing-xs: 0.25rem;
+    --spacing-sm: 0.5rem;
+    --spacing-md: 1rem;
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    
+    /* Typography */
+    --font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 
+                        'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    --font-family-mono: 'Courier New', 'Courier', monospace;
+    
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.5rem;
+    --font-size-2xl: 2rem;
+    --font-size-3xl: 2.5rem;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.15);
+    
+    /* Border Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    
+    /* Transitions */
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.2s ease;
+    --transition-slow: 0.3s ease;
+}
+
+/* === Base Styles === */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+    color: var(--color-text-primary);
+    background-color: var(--color-bg-secondary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* === Layout Container === */
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--spacing-xl);
+}
+
+/* === Header === */
+header {
+    text-align: center;
+    margin-bottom: var(--spacing-xl);
+    padding-bottom: var(--spacing-lg);
+    border-bottom: 3px solid var(--color-primary);
+}
+
+header h1 {
+    font-size: var(--font-size-3xl);
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-sm);
+    font-weight: 700;
+    letter-spacing: -0.5px;
+}
+
+header p {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-lg);
+}
+
+/* === Upload Section === */
+.upload-section {
+    background: var(--color-bg-primary);
+    padding: var(--spacing-xl);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    margin-bottom: var(--spacing-xl);
+}
+
+.upload-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex-wrap: wrap;
+}
+
+#fileInput {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 2px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    transition: border-color var(--transition-base);
+}
+
+#fileInput:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+#uploadBtn {
+    background-color: var(--color-primary);
+    color: var(--color-bg-primary);
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-xl);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color var(--transition-base);
+}
+
+#uploadBtn:hover {
+    background-color: var(--color-primary-dark);
+}
+
+#uploadBtn:disabled {
+    background-color: var(--color-text-muted);
+    cursor: not-allowed;
+}
+
+#uploadBtn:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+}
+
+/* === Status Messages === */
+.status-message {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    text-align: center;
+    color: var(--color-secondary);
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    background-color: var(--color-bg-hover);
+}
+
+.error-message {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background-color: var(--color-error-bg);
+    color: var(--color-error);
+    border-radius: var(--radius-sm);
+    border-left: 4px solid var(--color-error);
+}
+
+/* === Utility Class === */
+.hidden {
+    display: none !important;
+}
+
+/* === Summary Cards === */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+.card {
+    background: var(--color-bg-primary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    text-align: center;
+    transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.card h3 {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-sm);
+    font-weight: 600;
+}
+
+.card-value {
+    font-size: var(--font-size-2xl);
+    font-weight: 700;
+    color: var(--color-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.card-subtext {
+    color: var(--color-text-muted);
+    font-size: var(--font-size-sm);
+}
+
+.accent-positive {
+    color: var(--color-success);
+}
+
+/* === Content Grid === */
+.content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.3fr;
+    gap: var(--spacing-lg);
+    margin-bottom: var(--spacing-xl);
+}
+
+@media (max-width: 1024px) {
+    .content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* === Panel === */
+.panel {
+    background: var(--color-bg-primary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.panel h2 {
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+}
+
+/* === Search Input === */
+.search-input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    margin-bottom: var(--spacing-md);
+    border: 2px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    transition: border-color var(--transition-base);
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+
+.search-input::placeholder {
+    color: var(--color-text-muted);
+}
+
+/* === Data Table === */
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: var(--spacing-md);
+    font-size: var(--font-size-sm);
+}
+
+.data-table thead {
+    background-color: var(--color-bg-hover);
+}
+
+.data-table th {
+    padding: var(--spacing-sm) var(--spacing-md);
+    text-align: left;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.data-table th.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color var(--transition-fast);
+}
+
+.data-table th.sortable:hover {
+    background-color: var(--color-bg-active);
+}
+
+.data-table td {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-top: 1px solid var(--color-border-light);
+}
+
+.data-table tbody tr {
+    transition: background-color var(--transition-fast);
+    cursor: pointer;
+}
+
+.data-table tbody tr:hover {
+    background-color: var(--color-bg-hover);
+}
+
+/* Sort indicator */
+.sort-indicator {
+    display: inline-block;
+    margin-left: var(--spacing-xs);
+    opacity: 0.4;
+}
+
+/* Project color indicator */
+.project-color {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: var(--spacing-sm);
+    vertical-align: middle;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Number formatting */
+.number {
+    font-family: var(--font-family-mono);
+    font-weight: 600;
+}
+
+.positive-diff {
+    color: var(--color-success);
+}
+
+.negative-diff {
+    color: var(--color-error);
+}
+
+/* === Paddock Details === */
+.paddock-details {
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 2px solid var(--color-border-light);
+}
+
+.details-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.details-header h3 {
+    color: var(--color-primary);
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+}
+
+.close-button {
+    background-color: var(--color-text-muted);
+    color: var(--color-bg-primary);
+    border: none;
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    transition: background-color var(--transition-base);
+}
+
+.close-button:hover {
+    background-color: var(--color-text-secondary);
+}
+
+/* === Map === */
+#map {
+    height: 500px;
+    width: 100%;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border-light);
+}
+
+/* Leaflet popup customization */
+.leaflet-popup-content-wrapper {
+    border-radius: var(--radius-md);
+}
+
+.leaflet-popup-content {
+    margin: var(--spacing-md);
+    line-height: 1.6;
+    font-size: var(--font-size-sm);
+}
+
+.leaflet-popup-content strong {
+    color: var(--color-primary);
+    font-size: var(--font-size-base);
+    display: block;
+    margin-bottom: var(--spacing-xs);
+}
+
+/* === Info Section === */
+.info-section {
+    background: var(--color-bg-primary);
+    padding: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+}
+
+.info-section summary {
+    font-weight: 600;
+    cursor: pointer;
+    color: var(--color-secondary);
+    padding: var(--spacing-sm);
+    user-select: none;
+    list-style: none;
+    transition: background-color var(--transition-base);
+}
+
+.info-section summary:hover {
+    background-color: var(--color-bg-hover);
+    border-radius: var(--radius-sm);
+}
+
+.info-section summary::-webkit-details-marker {
+    display: none;
+}
+
+.info-section summary::before {
+    content: '▶ ';
+    display: inline-block;
+    transition: transform var(--transition-base);
+}
+
+.info-section[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.info-content {
+    padding: var(--spacing-md) var(--spacing-sm);
+    line-height: 1.8;
+}
+
+.info-content h4 {
+    margin-bottom: var(--spacing-md);
+    color: var(--color-text-primary);
+    font-size: var(--font-size-lg);
+}
+
+.info-content h5 {
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-sm);
+    color: var(--color-primary);
+    font-size: var(--font-size-base);
+}
+
+.info-block {
+    margin-bottom: var(--spacing-lg);
+}
+
+.info-block:last-child {
+    margin-bottom: 0;
+}
+
+.info-block p {
+    color: var(--color-text-secondary);
+    margin-bottom: var(--spacing-sm);
+}
+
+/* === Responsive Design === */
+@media (max-width: 768px) {
+    .container {
+        padding: var(--spacing-md);
+    }
+    
+    header h1 {
+        font-size: var(--font-size-xl);
+    }
+    
+    .upload-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    #fileInput,
+    #uploadBtn {
+        width: 100%;
+    }
+    
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+    
+    #map {
+        height: 350px;
+    }
+    
+    .data-table {
+        font-size: var(--font-size-xs);
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+}
+
+/* === Print Styles === */
+@media print {
+    .upload-section,
+    .close-button {
+        display: none;
+    }
+    
+    .panel,
+    .card,
+    .info-section {
+        box-shadow: none;
+        border: 1px solid var(--color-border);
+    }
+}

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loam Paddock Analyser</title>
+    
+    <!-- Leaflet CSS for map functionality -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    
+    <!-- Custom application styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        
+        <!-- Application Header -->
+        <header>
+            <h1>Paddock Analyser</h1>
+            <p>Upload a GeoJSON file to analyze paddock areas grouped by project</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <section class="upload-section">
+            <div class="upload-controls">
+                <input type="file" 
+                       id="fileInput" 
+                       accept=".geojson,.json"
+                       aria-label="Select GeoJSON file">
+                <button id="uploadBtn" 
+                        onclick="uploadFile()"
+                        aria-label="Upload and analyze file">
+                    Analyze Paddocks
+                </button>
+            </div>
+            
+            <!-- Status messages -->
+            <div id="loading" class="status-message hidden">Processing file...</div>
+            <div id="error" class="error-message hidden"></div>
+        </section>
+
+        <!-- Results Section (hidden until upload succeeds) -->
+        <section id="results" class="hidden">
+            
+            <!-- Summary Statistics Cards -->
+            <div class="summary-cards">
+                <div class="card">
+                    <h3>Total Area</h3>
+                    <p id="totalArea" class="card-value">-</p>
+                    <p id="totalAreaAc" class="card-subtext">-</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Projects</h3>
+                    <p id="totalProjects" class="card-value">-</p>
+                    <p class="card-subtext">Unique groupings</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Paddocks</h3>
+                    <p id="totalPaddocks" class="card-value">-</p>
+                    <p id="validInvalidCount" class="card-subtext">-</p>
+                </div>
+                
+                <div class="card">
+                    <h3>Geodesic Accuracy</h3>
+                    <p id="accuracyGain" class="card-value accent-positive">-</p>
+                    <p class="card-subtext">vs planar calculation</p>
+                </div>
+            </div>
+
+            <!-- Two-column layout: Table | Map -->
+            <div class="content-grid">
+                
+                <!-- Left Panel: Projects Table -->
+                <div class="panel">
+                    <h2>Projects Overview</h2>
+                    
+                    <!-- Search/filter functionality -->
+                    <input type="text" 
+                           id="searchBox" 
+                           class="search-input"
+                           placeholder="Filter by project or paddock name..." 
+                           onkeyup="filterTable()"
+                           aria-label="Search projects">
+                    
+                    <!-- Projects summary table -->
+                    <table id="projectsTable" class="data-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)" class="sortable">
+                                    Project Name
+                                    <span class="sort-indicator"></span>
+                                </th>
+                                <th onclick="sortTable(1)" class="sortable">
+                                    Paddocks
+                                    <span class="sort-indicator"></span>
+                                </th>
+                                <th onclick="sortTable(2)" class="sortable">
+                                    Area (ha)
+                                    <span class="sort-indicator"></span>
+                                </th>
+                                <th onclick="sortTable(3)" class="sortable">
+                                    Area (ac)
+                                    <span class="sort-indicator"></span>
+                                </th>
+                                <th onclick="sortTable(4)" class="sortable">
+                                    Geo vs Planar
+                                    <span class="sort-indicator"></span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="projectsBody">
+                            <!-- Populated dynamically by JavaScript -->
+                        </tbody>
+                    </table>
+                    
+                    <!-- Detailed paddock view (shown when project row is clicked) -->
+                    <div id="paddockDetails" class="paddock-details hidden">
+                        <div class="details-header">
+                            <h3 id="selectedProjectName">Project Paddocks</h3>
+                            <button onclick="closePaddockDetails()" 
+                                    class="close-button"
+                                    aria-label="Close details">
+                                Close
+                            </button>
+                        </div>
+                        
+                        <table id="paddocksTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Paddock Name</th>
+                                    <th>Area (ha)</th>
+                                    <th>Area (ac)</th>
+                                    <th>Difference</th>
+                                </tr>
+                            </thead>
+                            <tbody id="paddocksBody">
+                                <!-- Populated dynamically by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Interactive Map -->
+                <div class="panel">
+                    <h2>Map View</h2>
+                    <div id="map" aria-label="Interactive paddock map"></div>
+                </div>
+
+            </div>
+
+            <!-- Expandable information section -->
+            <details class="info-section">
+                <summary>About Geodesic vs Planar Calculations</summary>
+                <div class="info-content">
+                    <h4>Understanding Area Calculation Methods</h4>
+                    
+                    <div class="info-block">
+                        <h5>Planar (Flat Earth Approximation)</h5>
+                        <p>
+                            Treats geographic coordinates as if they exist on a flat, 2D plane. 
+                            This method is computationally simple but becomes increasingly 
+                            inaccurate as area size increases and at higher latitudes where 
+                            Earth's curvature is more pronounced.
+                        </p>
+                    </div>
+                    
+                    <div class="info-block">
+                        <h5>Geodesic (WGS84 Ellipsoid)</h5>
+                        <p>
+                            Calculates area on the WGS84 ellipsoid, which accurately models 
+                            Earth's shape. This is the international standard (ISO 19111) used 
+                            by GPS systems, precision agriculture, and official land surveys. 
+                            It accounts for Earth's curvature and provides measurements accurate 
+                            to within centimeters.
+                        </p>
+                    </div>
+                    
+                    <div class="info-block">
+                        <h5>Why the Difference Matters</h5>
+                        <p>
+                            The difference between planar and geodesic calculations varies based 
+                            on latitude, area size, and shape. For agricultural planning, yield 
+                            calculations, and legal land records, geodesic measurements are 
+                            essential for accuracy. The difference percentage shown represents 
+                            how much more accurate the geodesic calculation is compared to the 
+                            planar approximation.
+                        </p>
+                    </div>
+                </div>
+            </details>
+
+        </section>
+    </div>
+
+    <!-- Leaflet JavaScript library for map functionality -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+    
+    <!-- Application logic -->
+    <script src="app.js"></script>
+</body>
+</html>
