@@ -4,7 +4,7 @@ Geometry processing and geodesic area calculations.
 This module handles:
 1. Converting GeoJSON to Shapely geometries
 2. Validating and repairing invalid geometries
-3. Calculating geodesic area (accounting for Earth's curvature)
+3. Calculating both planar and geodesic areas
 4. Supporting multiple units (m², hectares, acres)
 """
 
@@ -17,6 +17,40 @@ from pyproj import Geod
 # WGS84 ellipsoid - standard for GPS and GeoJSON
 # This is Earth's actual shape (slightly flattened sphere)
 WGS84 = Geod(ellps="WGS84")
+
+
+def calculate_planar_area_m2(geom: BaseGeometry) -> float:
+    """
+    Calculate planar area in square meters.
+    
+    This uses simple Euclidean geometry (treats Earth as flat).
+    Uses an approximate conversion at mid-latitudes (~45°N).
+    
+    WARNING: This is LESS accurate than geodesic, especially for:
+    - Large areas
+    - High latitudes
+    - North-south oriented polygons
+    
+    Args:
+        geom: Shapely geometry object
+        
+    Returns:
+        Approximate area in square meters
+    """
+    # Get area in square degrees
+    area_deg2 = geom.area
+    
+    # Approximate conversion for mid-latitudes (45°)
+    # 1° latitude ≈ 111,320 meters
+    # 1° longitude ≈ 78,847 meters (at 45°N)
+    # This is a rough approximation!
+    meters_per_degree_lat = 111_320
+    meters_per_degree_lon = 78_847  # At ~45°N
+    
+    # Convert square degrees to square meters (rough approximation)
+    area_m2 = area_deg2 * meters_per_degree_lat * meters_per_degree_lon
+    
+    return abs(area_m2)
 
 
 def calculate_geodesic_area_m2(geom: BaseGeometry) -> float:
@@ -48,15 +82,16 @@ def calculate_geodesic_area_m2(geom: BaseGeometry) -> float:
         # Calculate area using geodesic method
         # Returns: (area, perimeter)
         area, _ = WGS84.polygon_area_perimeter(lons, lats)
+        area = abs(area)  # Ensure positive
         
         # Subtract holes (interior rings)
         for interior_ring in poly.interiors:
             i_lons, i_lats = interior_ring.coords.xy
             hole_area, _ = WGS84.polygon_area_perimeter(i_lons, i_lats)
-            # hole_area is typically negative, so adding it subtracts
-            area += hole_area
+            # Subtract the absolute value of hole area
+            area -= abs(hole_area)
         
-        return abs(area)
+        return area
     
     # Handle different geometry types
     if isinstance(geom, Polygon):
@@ -124,15 +159,21 @@ def get_feature_area(feature: Dict[str, Any]) -> Optional[Dict[str, float]]:
     """
     Extract and calculate area for a GeoJSON feature.
     
+    Calculates BOTH planar and geodesic areas for comparison.
+    
     Args:
         feature: GeoJSON Feature dict
         
     Returns:
-        Dict with area in multiple units, or None if geometry is invalid
+        Dict with area in multiple units and comparison, or None if geometry is invalid
         {
-            "area_m2": 1234567.89,
-            "area_ha": 123.46,
-            "area_ac": 305.12
+            "area_planar_m2": 1234567.89,
+            "area_geodesic_m2": 1381101.05,
+            "area_m2": 1381101.05,  # Same as geodesic (primary)
+            "area_ha": 138.11,
+            "area_ac": 341.28,
+            "difference_m2": 146533.16,
+            "difference_percent": 10.6
         }
     """
     # Validate and repair geometry
@@ -141,16 +182,26 @@ def get_feature_area(feature: Dict[str, Any]) -> Optional[Dict[str, float]]:
     if error or not geom:
         return None
     
-    # Calculate area in square meters
-    area_m2 = calculate_geodesic_area_m2(geom)
+    # Calculate BOTH areas
+    planar_m2 = calculate_planar_area_m2(geom)
+    geodesic_m2 = calculate_geodesic_area_m2(geom)
     
+    # Calculate difference
+    difference_m2 = geodesic_m2 - planar_m2
+    difference_percent = (difference_m2 / planar_m2 * 100) if planar_m2 > 0 else 0
+    
+    # Use geodesic as primary (more accurate)
     # Convert to other units
     # 1 hectare = 10,000 m²
     # 1 acre = 4,046.86 m² (approximately)
     return {
-        "area_m2": area_m2,
-        "area_ha": area_m2 / 10_000,
-        "area_ac": area_m2 * 0.000247105,  # More precise conversion factor
+        "area_planar_m2": planar_m2,
+        "area_geodesic_m2": geodesic_m2,
+        "area_m2": geodesic_m2,  # Primary value (geodesic)
+        "area_ha": geodesic_m2 / 10_000,
+        "area_ac": geodesic_m2 * 0.000247105,
+        "difference_m2": difference_m2,
+        "difference_percent": difference_percent,
     }
 
 
@@ -177,9 +228,13 @@ def create_normalized_feature(feature: Dict[str, Any], area_info: Optional[Dict[
     
     # Add computed area properties if valid
     if area_info and geom:
+        normalized["properties"]["area_planar_m2"] = round(area_info["area_planar_m2"], 2)
+        normalized["properties"]["area_geodesic_m2"] = round(area_info["area_geodesic_m2"], 2)
         normalized["properties"]["area_m2"] = round(area_info["area_m2"], 2)
         normalized["properties"]["area_ha"] = round(area_info["area_ha"], 2)
         normalized["properties"]["area_ac"] = round(area_info["area_ac"], 2)
+        normalized["properties"]["difference_m2"] = round(area_info["difference_m2"], 2)
+        normalized["properties"]["difference_percent"] = round(area_info["difference_percent"], 2)
         normalized["properties"]["geometry_valid"] = True
         
         # Update geometry to repaired version
