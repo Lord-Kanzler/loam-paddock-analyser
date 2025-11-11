@@ -14,7 +14,8 @@ from pydantic import BaseModel, Field
 class PaddockDetail(BaseModel):
     """Individual paddock information."""
 
-    name: str = Field(..., description="Paddock name")
+    name: str = Field(..., description="Paddock name (also used as type)")
+    paddock_type: str = Field(..., description="Type derived from name field")
     area_ha: Optional[float] = Field(None, description="Area in hectares (geodesic)")
     area_ac: Optional[float] = Field(None, description="Area in acres (geodesic)")
     area_planar_m2: Optional[float] = Field(None, description="Planar area in m²")
@@ -26,9 +27,10 @@ class PaddockDetail(BaseModel):
 class ProjectSummary(BaseModel):
     """Summary statistics for a single project."""
 
+    owner: str = Field(..., description="Owner name")
     project_name: str = Field(..., description="Project name")
     paddock_count: int = Field(..., description="Total number of paddocks")
-    valid_paddocks: int = Field(..., description="Number of valid paddocks")
+    valid_paddocks: int = Field(..., description="Number of valid productive paddocks (excludes infrastructure)")
     invalid_paddocks: int = Field(..., description="Number of invalid paddocks")
     area_planar_m2: float = Field(..., description="Total planar area in square meters")
     area_geodesic_m2: float = Field(..., description="Total geodesic area in square meters")
@@ -45,7 +47,7 @@ class UploadSummary(BaseModel):
 
     total_projects: int = Field(..., description="Number of unique projects")
     total_paddocks: int = Field(..., description="Total number of paddocks")
-    invalid_paddocks: int = Field(..., description="Number of invalid paddocks")
+    invalid_paddocks: int = Field(..., description="Number of invalid paddocks (null project or bad geometry)")
     total_area_planar_m2: float = Field(..., description="Total planar area")
     total_area_geodesic_m2: float = Field(..., description="Total geodesic area")
     total_difference_m2: float = Field(..., description="Total difference")

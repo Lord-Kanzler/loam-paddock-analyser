@@ -501,6 +501,58 @@ header p {
     margin-bottom: var(--spacing-sm);
 }
 
+/* === Map Header with Toggle === */
+.map-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.map-header h2 {
+    margin-bottom: 0;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+}
+
+/* === Infrastructure Styling === */
+.infrastructure-row {
+    background-color: var(--color-bg-hover);
+    font-style: italic;
+    opacity: 0.7;
+}
+
+.infrastructure-row td {
+    color: var(--color-text-secondary);
+}
+
+/* === Invalid Paddock Styling === */
+.invalid-project-row {
+    background-color: rgba(231, 76, 60, 0.1);
+}
+
+.invalid-row {
+    background-color: rgba(231, 76, 60, 0.05);
+    color: var(--color-error);
+}
+
+.invalid-row td {
+    font-style: italic;
+}
+
 /* === Responsive Design === */
 @media (max-width: 768px) {
     .container {

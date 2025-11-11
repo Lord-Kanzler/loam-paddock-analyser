@@ -43,6 +43,38 @@ def health():
     return {"status": "ok"}
 
 
+def is_infrastructure(name: str) -> bool:
+    """
+    Check if paddock name indicates infrastructure.
+    
+    Infrastructure keywords: shed, house, building
+    Everything else is considered a productive paddock.
+    
+    Args:
+        name: Paddock name
+        
+    Returns:
+        True if infrastructure, False if productive paddock
+    """
+    name_lower = name.lower()
+    return any(keyword in name_lower for keyword in ['shed', 'house', 'building'])
+
+
+def extract_owner(feature: Dict[str, Any]) -> str:
+    """
+    Extract owner from feature properties.
+    
+    Args:
+        feature: GeoJSON Feature dict
+        
+    Returns:
+        Owner name or "Unknown"
+    """
+    props = feature.get("properties") or {}
+    owner = props.get("owner") or props.get("Owner") or props.get("OWNER")
+    return str(owner).strip() if owner else "Unknown"
+
+
 def extract_project_name(feature: Dict[str, Any]) -> str:
     """
     Extract project name from a GeoJSON feature's properties.
@@ -56,7 +88,7 @@ def extract_project_name(feature: Dict[str, Any]) -> str:
         feature: GeoJSON Feature dict
         
     Returns:
-        Project name, or "Unknown" if not found or null
+        Project name, or None if not found or null (indicates invalid paddock)
     """
     props = feature.get("properties") or {}
     
@@ -67,9 +99,9 @@ def extract_project_name(feature: Dict[str, Any]) -> str:
         props.get("project")
     )
     
-    # Return "Unknown" if null or empty string
+    # Return None if null or empty string (invalid paddock)
     if not project:
-        return "Unknown"
+        return None
     
     return str(project).strip()
 
@@ -117,8 +149,9 @@ async def upload(file: UploadFile = File(...)):
     # Get features
     features = data.get("features", [])
     
-    # Group by project with area calculations
+    # Group by owner+project with area calculations
     projects = defaultdict(lambda: {
+        "owner": None,
         "paddock_count": 0,
         "valid_paddocks": 0,
         "invalid_paddocks": 0,
@@ -133,25 +166,76 @@ async def upload(file: UploadFile = File(...)):
     normalized_features = []
     
     for feature in features:
+        owner = extract_owner(feature)
         project_name = extract_project_name(feature)
-        projects[project_name]["paddock_count"] += 1
         
-        # Get paddock name
+        # Get paddock name (use as type)
         props = feature.get("properties", {})
         paddock_name = props.get("name", "Unnamed")
+        
+        # If project_name is None, this is an invalid paddock
+        if project_name is None:
+            # Create invalid paddock entry
+            project_key = f"{owner}::Invalid Paddocks"
+            
+            # Set owner if not already set
+            if projects[project_key]["owner"] is None:
+                projects[project_key]["owner"] = owner
+            
+            projects[project_key]["paddock_count"] += 1
+            projects[project_key]["invalid_paddocks"] += 1
+            total_invalid += 1
+            
+            # Calculate area anyway for display
+            area_info = get_feature_area(feature)
+            
+            # Create normalized feature
+            normalized_feature = create_normalized_feature(feature, area_info)
+            normalized_feature["properties"]["paddock_type"] = paddock_name
+            normalized_feature["properties"]["owner"] = owner
+            normalized_feature["properties"]["is_invalid"] = True
+            normalized_features.append(normalized_feature)
+            
+            paddock = PaddockDetail(
+                name=paddock_name,
+                paddock_type=paddock_name,
+                area_ha=round(area_info["area_ha"], 2) if area_info else None,
+                area_ac=round(area_info["area_ac"], 2) if area_info else None,
+                area_planar_m2=round(area_info["area_planar_m2"], 2) if area_info else None,
+                area_geodesic_m2=round(area_info["area_geodesic_m2"], 2) if area_info else None,
+                difference_percent=round(area_info["difference_percent"], 2) if area_info else None,
+                note="No project assigned"
+            )
+            projects[project_key]["paddocks"].append(paddock)
+            continue
+        
+        # Valid project - proceed normally
+        project_key = f"{owner}::{project_name}"
+        
+        # Set owner if not already set
+        if projects[project_key]["owner"] is None:
+            projects[project_key]["owner"] = owner
+        
+        projects[project_key]["paddock_count"] += 1
         
         # Calculate area
         area_info = get_feature_area(feature)
         
         # Create normalized feature
         normalized_feature = create_normalized_feature(feature, area_info)
+        normalized_feature["properties"]["paddock_type"] = paddock_name
+        normalized_feature["properties"]["owner"] = owner
+        normalized_feature["properties"]["is_invalid"] = False
         normalized_features.append(normalized_feature)
         
         if area_info:
             # Valid geometry
-            projects[project_name]["valid_paddocks"] += 1
-            projects[project_name]["area_planar_m2"] += area_info["area_planar_m2"]
-            projects[project_name]["area_geodesic_m2"] += area_info["area_geodesic_m2"]
+            # Only count non-infrastructure as "valid productive paddocks"
+            if not is_infrastructure(paddock_name):
+                projects[project_key]["valid_paddocks"] += 1
+            
+            projects[project_key]["area_planar_m2"] += area_info["area_planar_m2"]
+            projects[project_key]["area_geodesic_m2"] += area_info["area_geodesic_m2"]
             
             total_planar += area_info["area_planar_m2"]
             total_geodesic += area_info["area_geodesic_m2"]
@@ -159,40 +243,55 @@ async def upload(file: UploadFile = File(...)):
             # Create PaddockDetail object
             paddock = PaddockDetail(
                 name=paddock_name,
+                paddock_type=paddock_name,
                 area_ha=round(area_info["area_ha"], 2),
                 area_ac=round(area_info["area_ac"], 2),
                 area_planar_m2=round(area_info["area_planar_m2"], 2),
                 area_geodesic_m2=round(area_info["area_geodesic_m2"], 2),
                 difference_percent=round(area_info["difference_percent"], 2),
             )
-            projects[project_name]["paddocks"].append(paddock)
+            projects[project_key]["paddocks"].append(paddock)
         else:
-            # Invalid geometry
-            projects[project_name]["invalid_paddocks"] += 1
+            # Invalid geometry - add to Invalid Paddocks group instead
+            projects[project_key]["invalid_paddocks"] += 1
+            total_invalid += 1
+            
+            # Create invalid paddock entry in "Invalid Paddocks" group
+            invalid_project_key = f"{owner}::Invalid Paddocks"
+            
+            # Set owner if not already set
+            if projects[invalid_project_key]["owner"] is None:
+                projects[invalid_project_key]["owner"] = owner
+            
+            projects[invalid_project_key]["paddock_count"] += 1
+            projects[invalid_project_key]["invalid_paddocks"] += 1
             
             error_msg = normalized_feature["properties"].get("error", "Invalid geometry")
             paddock = PaddockDetail(
                 name=paddock_name,
+                paddock_type=paddock_name,
                 area_ha=None,
                 area_ac=None,
                 area_planar_m2=None,
                 area_geodesic_m2=None,
                 difference_percent=None,
-                note=error_msg
+                note=f"{error_msg} (from {project_name})"
             )
-            projects[project_name]["paddocks"].append(paddock)
-            total_invalid += 1
+            projects[invalid_project_key]["paddocks"].append(paddock)
     
     # Convert to list of ProjectSummary objects
     project_list = []
-    for name, data in projects.items():
+    for project_key, data in projects.items():
+        owner, project_name = project_key.split("::", 1)
+        
         planar = data["area_planar_m2"]
         geodesic = data["area_geodesic_m2"]
         diff = geodesic - planar
         diff_pct = (diff / planar * 100) if planar > 0 else 0
         
         project_summary = ProjectSummary(
-            project_name=name,
+            owner=owner,
+            project_name=project_name,
             paddock_count=data["paddock_count"],
             valid_paddocks=data["valid_paddocks"],
             invalid_paddocks=data["invalid_paddocks"],
@@ -207,8 +306,8 @@ async def upload(file: UploadFile = File(...)):
         )
         project_list.append(project_summary)
     
-    # Sort by project name
-    project_list.sort(key=lambda p: p.project_name)
+    # Sort by owner, then project name
+    project_list.sort(key=lambda p: (p.owner, p.project_name))
 
     # Create normalized GeoJSON FeatureCollection
     normalized_geojson = {

@@ -76,13 +76,13 @@
                 
                 <!-- Left Panel: Projects Table -->
                 <div class="panel">
-                    <h2>Projects Overview</h2>
+                    <h2>Valid Projects</h2>
                     
                     <!-- Search/filter functionality -->
                     <input type="text" 
                            id="searchBox" 
                            class="search-input"
-                           placeholder="Filter by project or paddock name..." 
+                           placeholder="Filter by owner, project or paddock name..." 
                            onkeyup="filterTable()"
                            aria-label="Search projects">
                     
@@ -91,22 +91,26 @@
                         <thead>
                             <tr>
                                 <th onclick="sortTable(0)" class="sortable">
-                                    Project Name
+                                    Owner
                                     <span class="sort-indicator"></span>
                                 </th>
                                 <th onclick="sortTable(1)" class="sortable">
-                                    Paddocks
+                                    Project Name
                                     <span class="sort-indicator"></span>
                                 </th>
                                 <th onclick="sortTable(2)" class="sortable">
-                                    Area (ha)
+                                    Paddocks
                                     <span class="sort-indicator"></span>
                                 </th>
                                 <th onclick="sortTable(3)" class="sortable">
-                                    Area (ac)
+                                    Area (ha)
                                     <span class="sort-indicator"></span>
                                 </th>
                                 <th onclick="sortTable(4)" class="sortable">
+                                    Area (ac)
+                                    <span class="sort-indicator"></span>
+                                </th>
+                                <th onclick="sortTable(5)" class="sortable">
                                     Geo vs Planar
                                     <span class="sort-indicator"></span>
                                 </th>
@@ -116,6 +120,27 @@
                             <!-- Populated dynamically by JavaScript -->
                         </tbody>
                     </table>
+                    
+                    <!-- Invalid Paddocks Table (separate) -->
+                    <div id="invalidPaddocksSection" class="hidden invalid-section">
+                        <h2 class="invalid-section-title">Invalid Paddocks (No Project Assigned)</h2>
+                        
+                        <table id="invalidPaddocksTable" class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Owner</th>
+                                    <th>Paddock Name</th>
+                                    <th>Type</th>
+                                    <th>Area (ha)</th>
+                                    <th>Area (ac)</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invalidPaddocksBody">
+                                <!-- Populated dynamically by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
                     
                     <!-- Detailed paddock view (shown when project row is clicked) -->
                     <div id="paddockDetails" class="paddock-details hidden">
@@ -132,6 +157,7 @@
                             <thead>
                                 <tr>
                                     <th>Paddock Name</th>
+                                    <th>Type</th>
                                     <th>Area (ha)</th>
                                     <th>Area (ac)</th>
                                     <th>Difference</th>
@@ -146,7 +172,16 @@
 
                 <!-- Right Panel: Interactive Map -->
                 <div class="panel">
-                    <h2>Map View</h2>
+                    <div class="map-header">
+                        <h2>Map View</h2>
+                        <label class="toggle-label">
+                            <input type="checkbox" 
+                                   id="toggleInvalid" 
+                                   onchange="toggleInvalid()"
+                                   checked>
+                            <span>Show Invalid Paddocks</span>
+                        </label>
+                    </div>
                     <div id="map" aria-label="Interactive paddock map"></div>
                 </div>
 
