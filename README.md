@@ -37,6 +37,10 @@ Assumptions:
 
 ## Quick start
 
+**Requirements:**
+- Python 3.10+
+- pipenv
+
 **First time setup:**
 ```bash
 cd backend
@@ -81,15 +85,19 @@ pipenv run pytest
 
 ```
 loam-paddock-analyser/
+├── start.sh                 # Single-command startup script
 ├── backend/
 │   ├── app/
 │   │   ├── main.py          # FastAPI app and upload endpoint
 │   │   ├── geometry.py      # Geodesic calculations and validation
 │   │   └── models.py        # Pydantic response models
-│   └── tests/
+│   ├── tests/
+│   ├── Pipfile              # Python dependencies
+│   └── Pipfile.lock
 ├── frontend/
-│   ├── index.html
-│   ├── style.css
-│   └── app.js
-└── sample_paddocks.geojson
+│   ├── index.html           # Main UI
+│   ├── style.css            # Styling
+│   └── app.js               # Upload logic and map
+├── sample_paddocks.geojson  # Sample data file
+└── README.md
 ```
