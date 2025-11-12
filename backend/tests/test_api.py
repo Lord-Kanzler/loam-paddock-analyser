@@ -245,9 +245,9 @@ def test_upload_paddock_without_project():
     assert response.status_code == 200
     data = response.json()
     
-    # Should be grouped under "Unknown"
+    # Should be grouped under "Invalid Paddocks"
     assert data["summary"]["total_projects"] == 1
-    assert data["projects"][0]["project_name"] == "Unknown"
+    assert data["projects"][0]["project_name"] == "Invalid Paddocks"
 
 
 def test_upload_invalid_json():

@@ -74,10 +74,29 @@ python3 -m http.server 8080
 
 ## Running tests
 
+The backend includes unit tests for geometry calculations and API endpoints.
+
+**Run all tests:**
 ```bash
 cd backend
 pipenv run pytest
 ```
+
+**Run tests with verbose output:**
+```bash
+cd backend
+pipenv run pytest tests/ -v
+```
+
+**Run specific test file:**
+```bash
+cd backend
+pipenv run pytest tests/test_geometry.py -v
+```
+
+**Test coverage:**
+- `test_geometry.py` — tests for geodesic area calculations, geometry validation, and repair
+- `test_api.py` — tests for upload endpoint, grouping logic, invalid paddocks, and error handling
 
 ---
 
